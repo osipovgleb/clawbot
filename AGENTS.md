@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+- Отвечать пользователю на русском языке.
+
 - Repo: https://github.com/openclaw/openclaw
 - GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
 
