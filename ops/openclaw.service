@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenClaw Gateway (production)
+After=network.target
+
+[Service]
+Type=simple
+User=openclaw
+Group=openclaw
+WorkingDirectory=/opt/openclaw/current
+EnvironmentFile=/etc/openclaw/openclaw.env
+ExecStart=/usr/bin/env node /opt/openclaw/current/dist/entry.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

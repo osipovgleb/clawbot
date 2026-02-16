@@ -1,0 +1,85 @@
+name: Deploy Prod
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  build_and_verify:
+    name: Build and Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests (fast)
+        run: pnpm test:fast
+
+  deploy_prod:
+    name: Deploy Prod
+    runs-on: ubuntu-latest
+    needs: build_and_verify
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.VPS_PORT }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload deploy script
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "mkdir -p /opt/openclaw/bin"
+          cat ops/deploy.sh | ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "cat > /opt/openclaw/bin/deploy.sh && chmod 750 /opt/openclaw/bin/deploy.sh"
+
+      - name: Run deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "/opt/openclaw/bin/deploy.sh ${GITHUB_SHA}"
+
+      - name: Post-deploy checks
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "systemctl is-active openclaw.service"
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "curl -fsS http://127.0.0.1:18789/healthz >/dev/null || curl -fsS http://127.0.0.1:18789/ >/dev/null"
