@@ -1,6 +1,7 @@
 [Unit]
 Description=OpenClaw Gateway (production)
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -8,11 +9,15 @@ User=openclaw
 Group=openclaw
 WorkingDirectory=/opt/openclaw/current
 EnvironmentFile=/etc/openclaw/openclaw.env
-ExecStart=/usr/bin/env node /opt/openclaw/current/dist/entry.js
+ExecStart=/usr/bin/env node /opt/openclaw/current/dist/entry.js gateway --port 18789
 Restart=always
 RestartSec=5
 TimeoutStopSec=30
 KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/openclaw
 
 [Install]
 WantedBy=multi-user.target
